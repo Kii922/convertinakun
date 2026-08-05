@@ -1,5 +1,6 @@
 import html
 import re
+import time
 from aiogram import Router, types, F
 from aiogram.fsm.context import FSMContext
 
@@ -18,6 +19,7 @@ async def _handle_vpn_input(message: types.Message, state: FSMContext):
     Logic utama: deteksi protokol, simpan ke FSM, lanjut ke pemilihan mode.
     Dipanggil dari handler yang dalam state maupun yang tanpa state.
     """
+    start_time = time.time()
     text = message.text.strip()
 
     # Deteksi protokol berdasarkan skema URI
@@ -46,7 +48,15 @@ async def _handle_vpn_input(message: types.Message, state: FSMContext):
     # Cek admin
     is_admin = db.is_admin(message.from_user.id)
 
+    # Hitung ping dan format nama
+    end_time = time.time()
+    ping_ms = round((end_time - start_time) * 1000, 2)
+    user_name = message.from_user.full_name
+    username = f" (@{message.from_user.username})" if message.from_user.username else ""
+
     await message.answer(
+        f"Halo <b>{user_name}</b>{username}! 👋\n"
+        f"🏓 Ping: <code>{ping_ms} ms</code>\n\n"
         f"✅ Protokol <b>{protocol.upper()}</b> terdeteksi.\n\n"
         "Silakan pilih mode konversi di bawah ini:",
         reply_markup=get_mode_keyboard(is_admin=is_admin)
