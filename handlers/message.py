@@ -5,6 +5,7 @@ from aiogram.fsm.context import FSMContext
 
 from states.convert import ConvertVPN
 from keyboards.inline import get_mode_keyboard
+from database import db
 
 router = Router(name="message_router")
 
@@ -42,10 +43,13 @@ async def _handle_vpn_input(message: types.Message, state: FSMContext):
     # Lanjut ke tahap berikutnya: Pemilihan Mode
     await state.set_state(ConvertVPN.waiting_for_mode)
 
+    # Cek admin
+    is_admin = db.is_admin(message.from_user.id)
+
     await message.answer(
         f"✅ Protokol <b>{protocol.upper()}</b> terdeteksi.\n\n"
         "Silakan pilih mode konversi di bawah ini:",
-        reply_markup=get_mode_keyboard()
+        reply_markup=get_mode_keyboard(is_admin=is_admin)
     )
 
 @router.message(ConvertVPN.waiting_for_vpn_account, F.text)

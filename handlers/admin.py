@@ -1,3 +1,4 @@
+import time
 from aiogram import Router, types
 from aiogram.filters import Command
 from config import config
@@ -81,3 +82,48 @@ async def cmd_deldomain(message: types.Message):
         await message.answer(f"✅ Domain <b>{domain}</b> berhasil dihapus dari database.")
     else:
         await message.answer(f"❌ Domain <b>{domain}</b> tidak ditemukan di database.")
+
+@router.message(Command("ping"))
+async def cmd_ping(message: types.Message):
+    """Mengecek latency/kecepatan respons bot."""
+    if not check_admin(message):
+        return
+    start_time = time.time()
+    msg = await message.answer("🔄 Pinging...")
+    end_time = time.time()
+    await msg.edit_text(f"🏓 <b>Pong!</b>\nLatency: <code>{round((end_time - start_time) * 1000, 2)}ms</code>")
+
+@router.message(Command("broadcast"))
+async def cmd_broadcast(message: types.Message):
+    """Mengirim pesan ke seluruh user yang pernah memakai bot."""
+    if not check_admin(message):
+        return
+    
+    args = message.text.split(maxsplit=1)
+    if len(args) < 2:
+        await message.answer("❌ <b>Format Salah</b>\n\nGunakan format:\n<code>/broadcast [pesan]</code>")
+        return
+        
+    broadcast_msg = args[1]
+    users = db.get_all_users()
+    
+    if not users:
+        await message.answer("ℹ️ Belum ada user di database.")
+        return
+        
+    status_msg = await message.answer(f"⏳ Memulai broadcast ke {len(users)} user...")
+    
+    success = 0
+    failed = 0
+    for user_id in users:
+        try:
+            await message.bot.send_message(user_id, broadcast_msg)
+            success += 1
+        except Exception:
+            failed += 1
+            
+    await status_msg.edit_text(
+        f"✅ <b>Broadcast Selesai!</b>\n\n"
+        f"Berhasil terkirim: {success} user\n"
+        f"Gagal terkirim: {failed} user (bot diblokir)"
+    )

@@ -68,8 +68,28 @@ async def process_category_selection(callback: types.CallbackQuery, state: FSMCo
     )
 
 # ─────────────────────────────────────────────────────
-# BACK: Kembali ke daftar kategori
+# BACK: Kembali ke daftar mode dan kategori
 # ─────────────────────────────────────────────────────
+@router.callback_query(ConvertVPN.waiting_for_category_selection, F.data == "back_to_mode")
+async def process_back_to_mode(callback: types.CallbackQuery, state: FSMContext):
+    """
+    Tombol kembali dari daftar kategori ke daftar mode.
+    """
+    await callback.answer()
+    await state.set_state(ConvertVPN.waiting_for_mode)
+    
+    user_data = await state.get_data()
+    protocol = user_data.get("protocol", "unknown")
+    is_admin = db.is_admin(callback.from_user.id)
+    
+    from keyboards.inline import get_mode_keyboard
+    
+    await callback.message.edit_text(
+        f"✅ Protokol <b>{protocol.upper()}</b> terdeteksi.\n\n"
+        "Silakan pilih mode konversi di bawah ini:",
+        reply_markup=get_mode_keyboard(is_admin=is_admin)
+    )
+
 @router.callback_query(ConvertVPN.waiting_for_domain_selection, F.data == "back_to_category")
 async def process_back_to_category(callback: types.CallbackQuery, state: FSMContext):
     """
@@ -170,6 +190,8 @@ async def process_domain_selection(callback: types.CallbackQuery, state: FSMCont
         # [SECURITY] Wajib menghapus FSM setelah selesai
         await state.clear()
 
+@router.callback_query(ConvertVPN.waiting_for_mode, F.data == "admin_add_bug")
+@router.callback_query(ConvertVPN.waiting_for_category_selection, F.data == "admin_add_bug")
 @router.callback_query(ConvertVPN.waiting_for_domain_selection, F.data == "admin_add_bug")
 async def process_admin_add_bug(callback: types.CallbackQuery, state: FSMContext):
     if not db.is_admin(callback.from_user.id):

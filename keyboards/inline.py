@@ -7,13 +7,17 @@ def _short_hash(text: str, length: int = 8) -> str:
     """Buat hash pendek dari teks untuk callback data (mengatasi limit 64 byte Telegram)."""
     return hashlib.md5(text.encode()).hexdigest()[:length]
 
-def get_mode_keyboard() -> InlineKeyboardMarkup:
+def get_mode_keyboard(is_admin: bool = False) -> InlineKeyboardMarkup:
     """
     Keyboard Inline untuk memilih mode konversi: Wildcard atau WS.
     """
     builder = InlineKeyboardBuilder()
     builder.button(text="🌐 Wildcard", callback_data="mode_wildcard")
     builder.button(text="⚡ WS", callback_data="mode_ws")
+    
+    if is_admin:
+        builder.button(text="➕ Tambah Bug", callback_data="admin_add_bug")
+        
     builder.adjust(2)
     return builder.as_markup()
 
@@ -55,6 +59,9 @@ def get_category_keyboard(domains: List[dict], selected_mode: str = "all", is_ad
 
     # Tombol Custom Domain
     builder.button(text="✏️ Custom Domain", callback_data="domain_custom")
+    
+    # Tombol Kembali ke Mode
+    builder.button(text="⬅️ Kembali ke Mode", callback_data="back_to_mode")
 
     builder.adjust(2)
     return builder.as_markup()

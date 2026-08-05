@@ -128,4 +128,25 @@ class Database:
             logger.error(f"Error deleting domain: {e}")
             return False
 
+    def register_user(self, user_id: int, username: str = None):
+        """Mendaftarkan user ke database jika belum ada."""
+        try:
+            with self._get_connection() as conn:
+                conn.execute("INSERT OR IGNORE INTO users (user_id, username) VALUES (?, ?)", (user_id, username))
+                conn.commit()
+        except sqlite3.Error as e:
+            logger.error(f"Error registering user: {e}")
+
+    def get_all_users(self) -> List[int]:
+        """Mengambil semua ID user untuk broadcast."""
+        try:
+            with self._get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT user_id FROM users")
+                rows = cursor.fetchall()
+                return [row["user_id"] for row in rows]
+        except sqlite3.Error as e:
+            logger.error(f"Error fetching users: {e}")
+            return []
+
 db = Database()
