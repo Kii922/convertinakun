@@ -28,12 +28,16 @@ async def cmd_listdomain(message: types.Message):
         cat = d['category']
         if cat not in grouped:
             grouped[cat] = []
-        grouped[cat].append(d['domain'])
+        grouped[cat].append(d)
         
     for cat, doms in grouped.items():
         text += f"📁 <b>{cat}</b>\n"
-        for idx, d in enumerate(doms, 1):
-            text += f"  {idx}. <code>{d}</code>\n"
+        for idx, d_info in enumerate(doms, 1):
+            title = d_info.get('title', '')
+            mode = d_info.get('mode', 'all')
+            title_str = f" ({title})" if title else ""
+            mode_str = f"[{mode}] " if mode != 'all' else ""
+            text += f"  {idx}. {mode_str}<code>{d_info['domain']}</code>{title_str}\n"
         text += "\n"
         
     await message.answer(text)
@@ -44,16 +48,19 @@ async def cmd_adddomain(message: types.Message):
     if not check_admin(message):
         return
         
-    args = message.text.split(maxsplit=2)
+    args = message.text.split()
     if len(args) < 2:
-        await message.answer("❌ <b>Format Salah</b>\n\nGunakan format:\n<code>/adddomain [nama.domain.com] [kategori (opsional)]</code>\n\nContoh:\n<code>/adddomain vclass.telkomsel.com Telkomsel</code>")
+        await message.answer("❌ <b>Format Salah</b>\n\nGunakan format:\n<code>/adddomain [domain] [mode (opsional)] [kategori (opsional)] [judul (opsional)]</code>\n\nContoh:\n<code>/adddomain 104.17.3.81 ws Edukasi Edukasi_Zoom</code>")
         return
         
-    domain = args[1].strip().lower()
-    category = args[2].strip() if len(args) > 2 else "Umum"
+    domain = args[1].lower()
+    mode = args[2].lower() if len(args) > 2 else "all"
+    category = args[3].strip().title() if len(args) > 3 else "Umum"
+    title = " ".join(args[4:]).strip() if len(args) > 4 else ""
     
-    if db.add_domain(domain, category):
-        await message.answer(f"✅ Domain <b>{domain}</b> (Kategori: {category}) berhasil ditambahkan ke database.")
+    if db.add_domain(domain, category, mode, title):
+        title_str = f" ({title})" if title else ""
+        await message.answer(f"✅ Domain <b>{domain}</b>{title_str} (Mode: {mode}, Kategori: {category}) berhasil ditambahkan ke database.")
     else:
         await message.answer(f"❌ Domain <b>{domain}</b> gagal ditambahkan. (Mungkin sudah terdaftar).")
 

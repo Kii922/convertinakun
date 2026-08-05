@@ -17,10 +17,10 @@ def get_mode_keyboard() -> InlineKeyboardMarkup:
     builder.adjust(2)
     return builder.as_markup()
 
-def get_category_keyboard(domains: List[dict], is_admin: bool = False) -> InlineKeyboardMarkup:
+def get_category_keyboard(domains: List[dict], selected_mode: str = "all", is_admin: bool = False) -> InlineKeyboardMarkup:
     """
     Keyboard Tingkat 1: Menampilkan daftar KATEGORI sebagai tombol.
-    Setiap tombol mewakili satu kelompok domain (mis: XL, Telkomsel, dll).
+    Hanya menampilkan kategori yang memiliki domain sesuai dengan selected_mode (atau all).
     """
     builder = InlineKeyboardBuilder()
 
@@ -28,7 +28,11 @@ def get_category_keyboard(domains: List[dict], is_admin: bool = False) -> Inline
     seen = set()
     categories = []
     for d in domains:
-        cat = d["category"] if isinstance(d, dict) else "Umum"
+        d_mode = d.get("mode", "all")
+        if d_mode != "all" and selected_mode != "all" and d_mode != selected_mode:
+            continue # Skip domains that do not match the selected mode
+
+        cat = d.get("category", "Umum")
         if cat not in seen:
             seen.add(cat)
             categories.append(cat)
@@ -55,28 +59,44 @@ def get_category_keyboard(domains: List[dict], is_admin: bool = False) -> Inline
     builder.adjust(2)
     return builder.as_markup()
 
-def get_domain_keyboard(domains: List[dict], category: str, is_admin: bool = False) -> InlineKeyboardMarkup:
+def get_domain_keyboard(domains: List[dict], category: str, selected_mode: str = "all", is_admin: bool = False, delete_mode: bool = False) -> InlineKeyboardMarkup:
     """
     Keyboard Tingkat 2: Menampilkan daftar DOMAIN dalam satu kategori tertentu.
+    Jika delete_mode=True, tombol-tombol akan berfungsi untuk menghapus domain.
     """
     builder = InlineKeyboardBuilder()
 
-    # Filter domain berdasarkan kategori yang dipilih
-    filtered = [
-        d["domain"] if isinstance(d, dict) else d
-        for d in domains
-        if (d["category"] if isinstance(d, dict) else "Umum") == category
-    ]
+    # Filter domain berdasarkan kategori dan mode
+    filtered = []
+    for d in domains:
+        d_cat = d.get("category", "Umum")
+        d_mode = d.get("mode", "all")
+        
+        if d_cat == category and (d_mode == "all" or selected_mode == "all" or d_mode == selected_mode):
+            filtered.append(d)
 
-    for dom in filtered:
-        # Gunakan hash untuk menghindari limit 64 byte callback data
-        builder.button(text=dom, callback_data=f"dom_{_short_hash(dom)}")
+    for d in filtered:
+        dom = d["domain"]
+        title = d.get("title", "")
+        
+        # Format text tombol
+        btn_text = f"{dom} ({title})" if title else dom
+        if delete_mode:
+            btn_text = f"❌ Hapus {dom}"
+            
+        callback_prefix = "deldom_" if delete_mode else "dom_"
+        builder.button(text=btn_text, callback_data=f"{callback_prefix}{_short_hash(dom)}")
 
     # Tombol kembali ke daftar kategori
-    builder.button(text="⬅️ Kembali ke Kategori", callback_data="back_to_category")
+    if not delete_mode:
+        builder.button(text="⬅️ Kembali ke Kategori", callback_data="back_to_category")
 
-    if is_admin:
-        builder.button(text="➕ Tambah Bug (Admin)", callback_data="admin_add_bug")
+        if is_admin:
+            builder.button(text="➕ Tambah Bug", callback_data="admin_add_bug")
+            if filtered:
+                builder.button(text="🗑️ Hapus Bug", callback_data=f"admin_del_bug_mode_{_short_hash(category)}")
+    else:
+        builder.button(text="Batal Hapus", callback_data=f"cat_{_short_hash(category)}")
 
     builder.adjust(1)
     return builder.as_markup()

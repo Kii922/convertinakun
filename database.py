@@ -36,6 +36,16 @@ class Database:
                 except sqlite3.OperationalError:
                     pass # Kolom sudah ada
 
+                # Migrasi untuk tambahkan kolom mode dan title
+                try:
+                    cursor.execute("ALTER TABLE domains ADD COLUMN mode TEXT DEFAULT 'all'")
+                except sqlite3.OperationalError:
+                    pass
+                try:
+                    cursor.execute("ALTER TABLE domains ADD COLUMN title TEXT DEFAULT ''")
+                except sqlite3.OperationalError:
+                    pass
+
                 
                 # Tabel admins untuk menyimpan ID admin (Owner dipisah di config)
                 cursor.execute('''
@@ -74,9 +84,9 @@ class Database:
         try:
             with self._get_connection() as conn:
                 cursor = conn.cursor()
-                cursor.execute("SELECT domain, category FROM domains ORDER BY category, domain")
+                cursor.execute("SELECT domain, category, mode, title FROM domains ORDER BY category, domain")
                 rows = cursor.fetchall()
-                return [{"domain": row["domain"], "category": row["category"] or "Umum"} for row in rows]
+                return [{"domain": row["domain"], "category": row["category"] or "Umum", "mode": row["mode"] or "all", "title": row["title"] or ""} for row in rows]
         except sqlite3.Error as e:
             logger.error(f"Error fetching domains: {e}")
             return []
@@ -93,11 +103,11 @@ class Database:
         except sqlite3.Error:
             return False
 
-    def add_domain(self, domain: str, category: str = "Umum") -> bool:
-        """Menambahkan domain baru ke database beserta kategorinya."""
+    def add_domain(self, domain: str, category: str = "Umum", mode: str = "all", title: str = "") -> bool:
+        """Menambahkan domain baru ke database beserta kategorinya, mode, dan judul."""
         try:
             with self._get_connection() as conn:
-                conn.execute("INSERT INTO domains (domain, category) VALUES (?, ?)", (domain, category))
+                conn.execute("INSERT INTO domains (domain, category, mode, title) VALUES (?, ?, ?, ?)", (domain, category, mode, title))
                 conn.commit()
                 return True
         except sqlite3.IntegrityError:

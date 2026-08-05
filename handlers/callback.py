@@ -33,7 +33,7 @@ async def process_mode_selection(callback: types.CallbackQuery, state: FSMContex
     await callback.message.edit_text(
         f"Mode <b>{mode.upper()}</b> dipilih. ✅\n\n"
         "Pilih <b>kategori</b> domain yang ingin digunakan:",
-        reply_markup=get_category_keyboard(domains)
+        reply_markup=get_category_keyboard(domains, selected_mode=mode)
     )
 
 # ─────────────────────────────────────────────────────
@@ -58,10 +58,13 @@ async def process_category_selection(callback: types.CallbackQuery, state: FSMCo
 
     is_admin = db.is_admin(callback.from_user.id)
 
+    user_data = await state.get_data()
+    mode = user_data.get("mode", "all")
+
     await callback.message.edit_text(
         f"📁 Kategori: <b>{category}</b>\n\n"
         "Pilih domain yang akan digunakan untuk konversi:",
-        reply_markup=get_domain_keyboard(domains, category=category, is_admin=is_admin)
+        reply_markup=get_domain_keyboard(domains, category=category, selected_mode=mode, is_admin=is_admin)
     )
 
 # ─────────────────────────────────────────────────────
@@ -82,7 +85,7 @@ async def process_back_to_category(callback: types.CallbackQuery, state: FSMCont
     await callback.message.edit_text(
         f"Mode <b>{mode.upper()}</b> dipilih. ✅\n\n"
         "Pilih <b>kategori</b> domain yang ingin digunakan:",
-        reply_markup=get_category_keyboard(domains)
+        reply_markup=get_category_keyboard(domains, selected_mode=mode)
     )
 
 # ─────────────────────────────────────────────────────
@@ -167,9 +170,6 @@ async def process_domain_selection(callback: types.CallbackQuery, state: FSMCont
         # [SECURITY] Wajib menghapus FSM setelah selesai
         await state.clear()
 
-# ─────────────────────────────────────────────────────
-# ADMIN: Tambah Bug (bisa dari level domain)
-# ─────────────────────────────────────────────────────
 @router.callback_query(ConvertVPN.waiting_for_domain_selection, F.data == "admin_add_bug")
 async def process_admin_add_bug(callback: types.CallbackQuery, state: FSMContext):
     if not db.is_admin(callback.from_user.id):
@@ -180,7 +180,65 @@ async def process_admin_add_bug(callback: types.CallbackQuery, state: FSMContext
     await state.set_state(ConvertVPN.waiting_for_new_bug)
     await callback.message.edit_text(
         "Silakan ketik Bug baru yang ingin ditambahkan.\n"
-        "Format: <code>domain.com Kategori</code>\n"
-        "Contoh: <code>vclass.telkomsel.com Telkomsel</code>\n\n"
-        "Jika tanpa kategori, otomatis masuk ke <b>Umum</b>."
+        "Format: <code>domain.com mode Kategori Judul</code>\n"
+        "Contoh: <code>104.17.3.81 ws Edukasi Edukasi_Zoom</code>\n\n"
+        "Note: <i>mode</i> bisa <b>ws</b>, <b>wildcard</b>, atau <b>all</b>.\n"
+        "Jika hanya input domain, akan otomatis ke mode <b>all</b> dan kategori <b>Umum</b>."
+    )
+
+@router.callback_query(ConvertVPN.waiting_for_domain_selection, F.data.startswith("admin_del_bug_mode_"))
+async def process_admin_delete_mode(callback: types.CallbackQuery, state: FSMContext):
+    if not db.is_admin(callback.from_user.id):
+        await callback.answer("Akses ditolak.", show_alert=True)
+        return
+
+    await callback.answer()
+    hash_val = callback.data.split("admin_del_bug_mode_", 1)[1]
+    domains = db.get_all_domains()
+    category = resolve_category_from_hash(domains, hash_val)
+
+    if not category:
+        await callback.message.edit_text("❌ Kategori tidak ditemukan.")
+        return
+
+    user_data = await state.get_data()
+    mode = user_data.get("mode", "all")
+
+    await callback.message.edit_text(
+        f"🗑️ <b>Mode Hapus</b> Kategori: <b>{category}</b>\n\n"
+        "Pilih domain yang ingin Anda hapus dari database:",
+        reply_markup=get_domain_keyboard(domains, category=category, selected_mode=mode, is_admin=True, delete_mode=True)
+    )
+
+@router.callback_query(ConvertVPN.waiting_for_domain_selection, F.data.startswith("deldom_"))
+async def process_admin_delete_domain(callback: types.CallbackQuery, state: FSMContext):
+    if not db.is_admin(callback.from_user.id):
+        await callback.answer("Akses ditolak.", show_alert=True)
+        return
+
+    hash_val = callback.data.split("deldom_", 1)[1]
+    domains = db.get_all_domains()
+    domain = resolve_domain_from_hash(domains, hash_val)
+
+    if not domain:
+        await callback.answer("❌ Domain tidak ditemukan.", show_alert=True)
+        return
+
+    if db.delete_domain(domain):
+        await callback.answer(f"✅ Domain {domain} berhasil dihapus!", show_alert=True)
+    else:
+        await callback.answer(f"❌ Gagal menghapus domain {domain}.", show_alert=True)
+
+    # Kembali ke daftar domain di kategori saat ini
+    user_data = await state.get_data()
+    mode = user_data.get("mode", "all")
+    category = user_data.get("selected_category", "Umum")
+    
+    # Refresh domain list
+    domains = db.get_all_domains()
+    
+    await callback.message.edit_text(
+        f"📁 Kategori: <b>{category}</b>\n\n"
+        "Pilih domain yang akan digunakan untuk konversi:",
+        reply_markup=get_domain_keyboard(domains, category=category, selected_mode=mode, is_admin=True)
     )

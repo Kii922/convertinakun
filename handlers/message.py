@@ -144,23 +144,26 @@ async def process_new_bug(message: types.Message, state: FSMContext):
     if not db.is_admin(message.from_user.id):
         return
 
-    args = message.text.strip().split(maxsplit=1)
+    args = message.text.strip().split()
     new_bug = args[0].lower()
-    category = args[1].strip().title() if len(args) > 1 else "Umum"
+    bug_mode = args[1].lower() if len(args) > 1 else "all"
+    category = args[2].strip().title() if len(args) > 2 else "Umum"
+    title = " ".join(args[3:]).strip() if len(args) > 3 else ""
 
-    if db.add_domain(new_bug, category):
-        await message.answer(f"✅ Bug <b>{new_bug}</b> (Kategori: <b>{category}</b>) berhasil ditambahkan ke database!")
+    if db.add_domain(new_bug, category, bug_mode, title):
+        title_str = f" ({title})" if title else ""
+        await message.answer(f"✅ Bug <b>{new_bug}</b>{title_str} (Mode: <b>{bug_mode}</b>, Kategori: <b>{category}</b>) berhasil ditambahkan ke database!")
     else:
         await message.answer(f"❌ Bug <b>{new_bug}</b> gagal ditambahkan (mungkin sudah ada).")
 
     # Kembalikan user ke state pemilihan KATEGORI
     await state.set_state(ConvertVPN.waiting_for_category_selection)
     user_data = await state.get_data()
-    mode = user_data.get("mode", "")
+    mode = user_data.get("mode", "all")
     domains = db.get_all_domains()
 
     await message.answer(
         f"Mode <b>{mode.upper()}</b> dipilih. ✅\n\n"
         "Pilih <b>kategori</b> domain yang ingin digunakan:",
-        reply_markup=get_category_keyboard(domains, is_admin=True)
+        reply_markup=get_category_keyboard(domains, selected_mode=mode, is_admin=True)
     )
