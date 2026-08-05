@@ -1,4 +1,5 @@
 import time
+import asyncio
 from aiogram import Router, types
 from aiogram.filters import Command
 from config import config
@@ -121,6 +122,9 @@ async def cmd_broadcast(message: types.Message):
             success += 1
         except Exception:
             failed += 1
+        
+        # Tambahkan delay untuk menghindari limit Telegram (30 pesan per detik)
+        await asyncio.sleep(0.05)
             
     await status_msg.edit_text(
         f"✅ <b>Broadcast Selesai!</b>\n\n"
